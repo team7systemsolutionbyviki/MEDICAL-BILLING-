@@ -2672,6 +2672,7 @@ function renderCustomers() {
                 <td style="color: #dc2626; font-weight: 600;">${settings.currency}${summary.credit.toFixed(2)}</td>
                 <td>
                     <button class="btn btn-outline" onclick="openPaymentModal('${c.id}')" title="Return Amount" style="padding: 5px; color: #16a34a; border-color: #16a34a;"><i data-lucide="arrow-down-to-dot" style="width: 14px;"></i></button>
+                    <button class="btn btn-outline" onclick="showCustomerHistory('${c.phone}')" title="Transaction History" style="padding: 5px; color: var(--primary-color); border-color: var(--primary-color);"><i data-lucide="history" style="width: 14px;"></i></button>
                     <button class="btn btn-outline" onclick="editCustomer('${c.id}')" style="padding: 5px;"><i data-lucide="edit-2" style="width: 14px;"></i></button>
                     ${sessionStorage.getItem('mediflow_user') === 'VIKI' ? `<button class="btn btn-outline" onclick="deleteCustomer('${c.id}')" style="padding: 5px; color: var(--danger-color);"><i data-lucide="trash" style="width: 14px;"></i></button>` : ''}
                 </td>
@@ -3158,6 +3159,60 @@ function handlePaymentSubmit(e) {
         renderCustomers();
         alert(`Payment of ${settings.currency}${amount} recorded for ${c.name}`);
     }
+}
+
+function showCustomerHistory(phone) {
+    const c = customers.find(cust => cust.phone === phone);
+    if (!c) return;
+
+    document.getElementById('hist-customer-name').textContent = c.name;
+    const tbody = document.getElementById('customer-history-body');
+    tbody.innerHTML = '';
+
+    // Get Sales
+    const cSales = sales.filter(s => s.customer && s.customer.phone === phone);
+    // Get Payments
+    const cPayments = customerPayments.filter(p => p.customerPhone === phone);
+
+    // Merge and Sort
+    const history = [
+        ...cSales.map(s => ({
+            date: s.date,
+            type: 'SALE',
+            ref: s.invoiceNo,
+            mode: s.paymentMode || 'Cash',
+            amount: s.grandTotal,
+            isDebit: s.paymentMode === 'Credit'
+        })),
+        ...cPayments.map(p => ({
+            date: p.date,
+            type: 'PAYMENT',
+            ref: 'PAY-' + p.id.substring(1, 8),
+            mode: p.method,
+            amount: p.amount,
+            isDebit: false
+        }))
+    ];
+
+    history.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #666;">No transactions found for this customer.</td></tr>';
+    } else {
+        tbody.innerHTML = history.map(h => `
+            <tr>
+                <td>${new Date(h.date).toLocaleString()}</td>
+                <td><span class="badge" style="background: ${h.type === 'SALE' ? '#e0f2fe' : '#dcfce7'}; color: ${h.type === 'SALE' ? '#0369a1' : '#16a34a'};">${h.type}</span></td>
+                <td>${h.ref}</td>
+                <td>${h.mode}</td>
+                <td style="font-weight: 600; color: ${h.isDebit ? '#dc2626' : '#16a34a'};">
+                    ${h.isDebit ? '' : '+'}${settings.currency}${h.amount.toFixed(2)}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('customer-history-modal').style.display = 'flex';
 }
 
 // --- Admin Management ---
